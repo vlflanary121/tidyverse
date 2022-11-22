@@ -30,6 +30,7 @@ Introduction to tidyverse is given in the R for Data Science book. Online pdf is
 
 Load the ggplot2 mpg data frame
 ```{r}
+library(ggplot2)
 mpg
 ```
 
@@ -261,21 +262,282 @@ ggplot(data = <DATA>) +
   *Rarely need to supply all parameters (bracketed above), since ggplot2 provides defaults for all except data, mappings, and the geom function.
   
 ## Data Transformation
+How to transform data using the dplyr package and a dataset on flights departing NYC in 2013. 
+
 ### Load packages
 ```{r}
 library(nycflights13)
-library(tidyverse)
+library(tidyverse) # will use both dplyr & ggplot2
 ```
 
 ### nycflights13 data
 ```{r}
-flights
+flights # note that this is a tibble, a df unique to the tidyverse
 ```
 
 ### dplyr basics
+The dplyr package contains the following functions:
+- Pick observations by their values (filter()).
+- Reorder the rows (arrange()).
+- Pick variables by their names (select()).
+- Create new variables with functions of existing variables (mutate()).
+- Collapse many values down to a single summary (summarise()).
+
+All verbs work similarly:
+1. The first argument is a data frame.
+2. The subsequent arguments describe what to do with the data frame, using the variable names (without quotes).
+3. The result is a new data frame.
+
 ### filter()
+Use to subset select rows
+```{r}
+# select all flights on Jan 1st
+filter(flights, month == 1, day == 1)
+```
+Can both save results in a variable and still print the result in one line by wrapping the assignment in ()
+```{r}
+(dec25 <- filter(flights, month == 12, day == 25))
+```
+
+filter() only includes rows where the condition is TRUE; it excludes both FALSE and NA values. If you want to preserve missing values, ask for them explicitly:
+```{r}
+df <- tibble(x = c(1, NA, 3))
+filter(df, x > 1)
+
+# vs
+
+filter(df, is.na(x) | x > 1)
+```
+
 ### arrange()
+Use to change the order of rows
+```{r}
+arrange(flights, year, month, day)
+```
+
+Use desc to re-order by a column in descending order
+```{r}
+arrange(flights, desc(dep_delay))
+```
+
+Missing values are always sorted at the end
+```{r}
+df <- tibble(x = c(5, 2, NA))
+arrange(df, x)
+arrange(df, desc(x))
+```
+
 ### select()
+Allows you to rapidly zoom in on a useful subset of a large dataset using operations based on the names of variables.
+
+```{r}
+# select columns by name
+select(flights, year, month, day)
+```
+
+```{r}
+# select columns between year and day 
+select(flights, year:day)
+```
+
+```{r}
+# select all columns except those from year to day
+select(flights, -(year:day))
+```
+
+There are a number of helper functions you can use within select():
+- starts_with("abc"): matches names that begin with “abc”.
+- ends_with("xyz"): matches names that end with “xyz”.
+- contains("ijk"): matches names that contain “ijk”.
+- matches("(.)\\1"): selects variables that match a regular expression. This one matches any variables that contain repeated characters. You’ll learn more about regular expressions in strings.
+- num_range("x", 1:3): matches x1, x2 and x3.
+
+See ?select for more details.
+
+Use the rename() function to rename variables that aren't explicitly mentioned (would be dropped if renaming with the select() function.)
+```{r}
+rename(flights, tail_num = tailnum) # tailnum -> tail_num; added the underscore
+```
+
+Another option is to use select() in conjunction with the everything() helper. This is useful if you have a handful of variables you’d like to move to the start of the data frame.
+```{r}
+select(flights, time_hour, air_time, everything())
+```
+
 ### mutate()
+Used to add new columns (to th end of the dataset) that are functions of existing columns.
+
+```{r}
+# create a narrower flights dataset to more easily view all columns
+flights_sml <- select(flights, 
+  year:day, 
+  ends_with("delay"), 
+  distance, 
+  air_time
+)
+
+# add new columns with mutate()
+mutate(flights_sml,
+  gain = dep_delay - arr_delay,
+  speed = distance / air_time * 60
+)
+```
+
+```{r}
+# refer to the newly created columns
+mutate(flights_sml,
+  gain = dep_delay - arr_delay,
+  hours = air_time / 60,
+  gain_per_hour = gain / hours
+)
+```
+
+Use transmute to only keep the new variables
+```{r}
+transmute(flights,
+  gain = dep_delay - arr_delay,
+  hours = air_time / 60,
+  gain_per_hour = gain / hours
+)
+```
+
 ### summarise()
-### Grouped mutates
+Collapses a data frame into a single row
+
+```{r}
+summarise(flights, delay = mean(dep_delay, na.rm = TRUE))
+# all aggregation function have an na-rm arg to remove missing values
+```
+
+summarise() is not terribly useful unless we pair it with group_by(). This changes the unit of analysis from the complete dataset to individual groups. The output is a grouped summary, one of the most commonly used tools when working with dplyr.
+
+```{r}
+by_day <- group_by(flights, year, month, day)
+summarise(by_day, delay = mean(dep_delay, na.rm = TRUE))
+```
+
+#### the pipe
+
+Explore the relationship between distance and average delay for each location
+```{r}
+by_dest <- group_by(flights, dest)  # group flights by destination
+delay <- summarise(by_dest, # summarize the compute distance, avg delay, & # of flights
+  count = n(),
+  dist = mean(distance, na.rm = TRUE),
+  delay = mean(arr_delay, na.rm = TRUE)
+)
+delay <- filter(delay, count > 20, dest != "HNL") # filter to remove noise & Honolulu
+
+# It looks like delays increase with distance up to ~750 miles 
+# and then decrease. Maybe as flights get longer there's more 
+# ability to make up delays in the air?
+ggplot(data = delay, mapping = aes(x = dist, y = delay)) +
+  geom_point(aes(size = count), alpha = 1/3) +
+  geom_smooth(se = FALSE)
+```
+
+Can achieve the same 3 steps using the pipe, %>%
+```{r}
+delays <- flights %>% 
+  group_by(dest) %>% 
+  summarise(
+    count = n(),
+    dist = mean(distance, na.rm = TRUE),
+    delay = mean(arr_delay, na.rm = TRUE)
+  ) %>% 
+  filter(count > 20, dest != "HNL")
+```
+
+#### counts
+Good idea to include a count or count of non-missing values to ensure you're not drawing conclusions from small amounts of data.
+
+Example: planes with the highest avg delays
+```{r}
+not_cancelled <- flights %>% 
+  filter(!is.na(dep_delay), !is.na(arr_delay))
+
+not_cancelled %>% 
+  group_by(year, month, day) %>% 
+  summarise(mean = mean(dep_delay))
+
+delays <- not_cancelled %>% 
+  group_by(tailnum) %>% 
+  summarise(
+    delay = mean(arr_delay)
+  )
+
+ggplot(data = delays, mapping = aes(x = delay)) + 
+  geom_freqpoly(binwidth = 10)
+```
+
+Draw a scatterplot of the above
+```{r}
+delays <- not_cancelled %>% 
+  group_by(tailnum) %>% 
+  summarise(
+    delay = mean(arr_delay, na.rm = TRUE),
+    n = n()
+  )
+
+ggplot(data = delays, mapping = aes(x = n, y = delay)) + 
+  geom_point(alpha = 1/10)
+```
+
+Filter out the groups with the smallest numbers of observations (often the largest sources of variation)
+```{r}
+delays %>% 
+  filter(n > 25) %>% 
+  ggplot(mapping = aes(x = n, y = delay)) + 
+    geom_point(alpha = 1/10)
+```
+
+#### grouping by multiple variables
+When you group by multiple variables, each summary peels off one level of the grouping. That makes it easy to progressively roll up a dataset:
+```{r}
+daily <- group_by(flights, year, month, day)
+(per_day   <- summarise(daily, flights = n()))
+```
+
+```{r}
+(per_month <- summarise(per_day, flights = sum(flights)))
+```
+
+```{r}
+(per_year  <- summarise(per_month, flights = sum(flights)))
+```
+
+#### ungrouping
+Use the ungroup() function to remove grouping or return to operations on ungrouped data
+```{r}
+daily %>% 
+  ungroup() %>%             # no longer grouped by date
+  summarise(flights = n())  # all flights
+```
+
+#### grouped mutates (and filters)
+A grouped filter is a grouped mutate followed by an ungrouped filter
+
+Find the worst members of each group:
+```{r}
+flights_sml %>% 
+  group_by(year, month, day) %>%
+  filter(rank(desc(arr_delay)) < 10)
+```
+
+Find all groups bigger than a threshold:
+```{r}
+popular_dests <- flights %>% 
+  group_by(dest) %>% 
+  filter(n() > 365)
+popular_dests
+```
+
+Standardise to compute per group metrics:
+```{r}
+popular_dests %>% 
+  filter(arr_delay > 0) %>% 
+  mutate(prop_delay = arr_delay / sum(arr_delay)) %>% 
+  select(year:day, dest, arr_delay, prop_delay)
+```
+
+## Workflow: scripts
