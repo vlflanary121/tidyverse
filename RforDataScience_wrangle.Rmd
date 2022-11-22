@@ -159,3 +159,31 @@ parse_factor() create factors, the data structure that R uses to represent categ
 parse_datetime(), parse_date(), and parse_time() allow you to parse various date & time specifications. These are the most complicated because there are so many different ways of writing dates.
 
 ### Parsing a file
+Guess the data type of each column using guess_parser() and parse_guess()
+guess_parser() returns readr's best guess, and
+parse_guess() uses that guess to parse the column
+```{r}
+guess_parser("2010-10-01")
+#> [1] "date"
+guess_parser("15:01")
+#> [1] "time"
+guess_parser(c("TRUE", "FALSE"))
+#> [1] "logical"
+guess_parser(c("1", "5", "9"))
+#> [1] "double"
+guess_parser(c("12,352,561"))
+#> [1] "number"
+
+str(parse_guess("2010-10-10"))
+#>  Date[1:1], format: "2010-10-10"
+```
+
+### Writing to a file
+```{r}
+# write_csv()
+write_csv(challenge, "challenge.csv")
+```
+
+Can also use write_tsv() or write_RDS()
+
+
