@@ -1,0 +1,281 @@
+---
+title: "tidyverse_packages"
+author: "Victoria"
+date: "2022-11-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Install packages
+```{r}
+# install.packages("tidyverse")
+# install.packages(c("nycflights13", "gapminder", "Lahman"))
+```
+
+# Load packages
+```{r}
+library(tidyverse)
+library(nycflights13)
+library(gapminder)
+library(Lahman)
+```
+
+Introduction to tidyverse is given in the R for Data Science book. Online pdf is given here: https://r4ds.had.co.nz/
+
+# Explore
+## Data visualization
+
+Load the ggplot2 mpg data frame
+```{r}
+mpg
+```
+
+### Creating a ggplot
+```{r}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy))
+```
+
+A graphing template
+```{r}
+# ggplot(data = <DATA>) + 
+ # <GEOM_FUNCTION>(mapping = aes(<MAPPINGS>))
+```
+
+Exercise
+```{r}
+ggplot(data = mpg)
+```
+
+```{r}
+nrow(mpg)
+ncol(mpg)
+```
+
+```{r}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = hwy, y = cyl))
+```
+
+```{r}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = class, y = drv)) # doesn't give number of vehicles under each category
+```
+
+### Aesthetic mapping
+You can add a third variable, like class, to a two dimensional scatterplot by mapping it to an aesthetic.
+
+```{r}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy, color = class))
+```
+
+### Common problems
+```{r}
+ggplot(data = mpg) 
++ geom_point(mapping = aes(x = displ, y = hwy)) # + has to be at the end of a line, not the start
+```
+
+### Facets
+Facets are subplots that each display one subset of the data.
+
+#### facet_wrap()
+```{r}
+# facet by a single variable 
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy)) + 
+  facet_wrap(~ class, nrow = 2)
+```
+
+#### facet_grid()
+```{r}
+# facet by multiple variables
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy)) + 
+  facet_grid(drv ~ cyl)
+```
+
+### Geometric objects
+A geom is the geometrical object that a plot uses to represent data. People often describe plots by the type of geom that the plot uses. For example, bar charts use bar geoms, line charts use line geoms, boxplots use boxplot geoms, and so on. Scatterplots break the trend; they use the point geom.
+
+To change the geom in your plot, change the geom function that you add to ggplot()
+
+```{r}
+# left
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy))
+
+# right
+ggplot(data = mpg) + 
+  geom_smooth(mapping = aes(x = displ, y = hwy))
+```
+
+To display multiple geoms in the same plot, add multiple geom functions to ggplot()
+
+```{r}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy)) +
+  geom_smooth(mapping = aes(x = displ, y = hwy))
+```
+
+If you place mappings in a geom function, ggplot2 will treat them as local mappings for the layer. It will use these mappings to extend or overwrite the global mappings for that layer only. This makes it possible to display different aesthetics in different layers.
+
+```{r}
+ggplot(data = mpg, mapping = aes(x = displ, y = hwy)) + 
+  geom_point(mapping = aes(color = class)) + 
+  geom_smooth()
+```
+
+You can use the same idea to specify different data for each layer. Here, our smooth line displays just a subset of the mpg dataset, the subcompact cars. The local data argument in geom_smooth() overrides the global data argument in ggplot() for that layer only.
+
+```{r}
+ggplot(data = mpg, mapping = aes(x = displ, y = hwy)) + 
+  geom_point(mapping = aes(color = class)) + 
+  geom_smooth(data = filter(mpg, class == "subcompact"), se = FALSE)
+```
+
+### Statistical transformations
+```{r}
+ggplot(data = diamonds) + 
+  geom_bar(mapping = aes(x = cut))
+```
+
+Can generally use geom and stats interchangeably - bc every stat has a default geom.
+
+```{r}
+ggplot(data = diamonds) + 
+  stat_count(mapping = aes(x = cut))
+```
+
+### Position adjustments
+Can color a plot with color or fill
+
+```{r}
+ggplot(data = diamonds) + 
+  geom_bar(mapping = aes(x = cut, colour = cut))
+ggplot(data = diamonds) + 
+  geom_bar(mapping = aes(x = cut, fill = cut))
+```
+
+Mapping the fill aesthetic to another variable automatically stacks the bars - due to position adjustment.
+
+```{r}
+ggplot(data = diamonds) + 
+  geom_bar(mapping = aes(x = cut, fill = clarity))
+```
+
+ If you don’t want a stacked bar chart, you can use one of three other options: "identity", "dodge" or "fill"
+ 
+#### identity
+position = "identity" will place each object exactly where it falls in the context of the graph. This is not very useful for bars, because it overlaps them. To see that overlapping we either need to make the bars slightly transparent by setting alpha to a small value, or completely transparent by setting fill = NA.
+
+```{r}
+ggplot(data = diamonds, mapping = aes(x = cut, fill = clarity)) + 
+  geom_bar(alpha = 1/5, position = "identity")
+ggplot(data = diamonds, mapping = aes(x = cut, colour = clarity)) + 
+  geom_bar(fill = NA, position = "identity")
+```
+ 
+#### dodge
+position = "fill" works like stacking, but makes each set of stacked bars the same height. This makes it easier to compare proportions across groups.
+
+```{r}
+ggplot(data = diamonds) + 
+  geom_bar(mapping = aes(x = cut, fill = clarity), position = "fill")
+```
+
+#### fill
+position = "dodge" places overlapping objects directly beside one another. This makes it easier to compare individual values.
+
+```{r}
+ggplot(data = diamonds) + 
+  geom_bar(mapping = aes(x = cut, fill = clarity), position = "dodge")
+```
+
+#### jitter
+position = "jitter" adds a small amount of random noise to each point. This spreads the points out because no two points are likely to receive the same amount of random noise.
+*specifically for scatterplots
+
+```{r}
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy), position = "jitter")
+```
+
+### Coordinate systems
+#### cord_flip()
+coord_flip() switches the x and y axes. This is useful (for example), if you want horizontal boxplots. It’s also useful for long labels: it’s hard to get them to fit without overlapping on the x-axis.
+
+```{r}
+ggplot(data = mpg, mapping = aes(x = class, y = hwy)) + 
+  geom_boxplot()
+ggplot(data = mpg, mapping = aes(x = class, y = hwy)) + 
+  geom_boxplot() +
+  coord_flip()
+```
+
+#### cord_quickmap()
+coord_quickmap() sets the aspect ratio correctly for maps. This is very important if you’re plotting spatial data with ggplot2
+
+```{r}
+nz <- map_data("nz")
+
+ggplot(nz, aes(long, lat, group = group)) +
+  geom_polygon(fill = "white", colour = "black")
+
+ggplot(nz, aes(long, lat, group = group)) +
+  geom_polygon(fill = "white", colour = "black") +
+  coord_quickmap()
+```
+
+#### cord_polar()
+coord_polar() uses polar coordinates. Polar coordinates reveal an interesting connection between a bar chart and a Coxcomb chart
+
+```{r}
+bar <- ggplot(data = diamonds) + 
+  geom_bar(
+    mapping = aes(x = cut, fill = cut), 
+    show.legend = FALSE,
+    width = 1
+  ) + 
+  theme(aspect.ratio = 1) +
+  labs(x = NULL, y = NULL)
+
+bar + coord_flip()
+bar + coord_polar()
+```
+
+### Layered grammar of graphics
+Code template:
+ggplot(data = <DATA>) + 
+  <GEOM_FUNCTION>(
+     mapping = aes(<MAPPINGS>),
+     stat = <STAT>, 
+     position = <POSITION>
+  ) +
+  <COORDINATE_FUNCTION> +
+  <FACET_FUNCTION>
+  
+  *Rarely need to supply all parameters (bracketed above), since ggplot2 provides defaults for all except data, mappings, and the geom function.
+  
+## Data Transformation
+### Load packages
+```{r}
+library(nycflights13)
+library(tidyverse)
+```
+
+### nycflights13 data
+```{r}
+flights
+```
+
+### dplyr basics
+### filter()
+### arrange()
+### select()
+### mutate()
+### summarise()
+### Grouped mutates
